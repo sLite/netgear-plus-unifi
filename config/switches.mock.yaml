@@ -1,14 +1,10 @@
 # Hardware-free development setup: two simulated NETGEAR switches.
 #   SWITCHES_CONFIG=./config/switches.mock.yaml docker compose \
 #     -f docker-compose.yml -f docker-compose.test.yml up -d --build
-collector:
-  listen: "0.0.0.0:8099"
-  poll_interval_seconds: 10
-
-emulator:
+controller:
   inform_url: "http://172.29.0.10:8080/inform"
-  collector_url: "http://collector:8099"
-  state_dir: "/data"
+
+poll_interval_seconds: 10
 
 switches:
   - id: mock-gs308ev4

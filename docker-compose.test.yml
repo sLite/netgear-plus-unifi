@@ -10,8 +10,8 @@ services:
     ports:
       - "127.0.0.1:18443:8443"
 
-  emulator:
-    depends_on: [collector, unifi-controller]
+  netgear-unifi:
+    depends_on: [unifi-controller]
     environment:
       UNIFI_INFORM_URL: http://172.29.0.10:8080/inform
 

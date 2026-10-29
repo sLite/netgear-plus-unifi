@@ -11,14 +11,20 @@ Both physical switches appear in UniFi Network as separate, adopted,
 **connected** UniFi switches. Their port tables come from the hardware: link
 state, negotiated speed, duplex (where the switch reports it), byte counters
 and rates. The devices stay connected through the normal inform lifecycle,
-survive emulator and collector restarts without re-adoption, go offline in
-UniFi when their NETGEAR is unreachable, and recover automatically.
+survive restarts without re-adoption, go offline in UniFi when their NETGEAR
+is unreachable, and recover automatically.
+
+The integration is one self-contained Go program (`netgear-unifi`, one
+container). It started as a Python collector (wrapping py-netgear-plus) plus
+a Go emulator; both were merged into Go, and every result below was
+re-verified with the Go version on both switches unless noted.
 
 Port management (opt-in per switch): VLANs, native VLAN, tagged VLANs, port
 disable, forced speed and port names set in UniFi's port editor are applied
 to the switch, which UniFi then manages like a native switch. Live writes were
-verified on port 4 of both switches (the only port cleared for testing); the
-whole-switch plan was verified in dry run. UniFi shows the device as
+verified on ports 4 and 5 of both switches (the ports cleared for testing);
+the whole-switch plan was verified in dry run. The device name is applied as
+the switch name. UniFi shows the device as
 *provisioning* until the NETGEAR matches. See [CONFIG-WRITE.md](CONFIG-WRITE.md).
 
 Example: controller-side port table of the GS116Ev2, read back via the
@@ -42,16 +48,16 @@ This matches the NETGEAR's own pages: ports 1 (10M), 2, 7, 8, 15 (1G) and
 | Discovery-free adoption (pending → adopt → connected, CBC → AES-GCM) | ✅ host run and Docker Compose | – | ✅ fake controller |
 | Two independent virtual switches (8 + 16 ports) | ✅ | ✅ both models | ✅ |
 | Link state, negotiated speed, byte counters, rates in `port_table` | ✅ via `stat/device` API | ✅ | ✅ recorded real pages |
-| Link change propagates to controller | ✅ (mock flapping port) | ⚠️ not tested: no cable was unplugged on your network | ✅ |
-| Restart survival (emulator, collector, container recreate) | ✅ | ✅ | ✅ |
-| Outage → offline in UniFi → automatic recovery | ✅ (collector stopped: informs paused after 90 s, controller showed *disconnected* ~2 min later, reconnected ~15 s after restart) | ✅ | ✅ |
-| Session displaced by web-UI login (GS116Ev2) → yield → recover | – | ✅ detected live | ✅ |
+| Link change propagates to controller | ✅ (mock flapping port, Python version) | ⚠️ not tested: no cable was unplugged on your network | ✅ |
+| Restart survival (process restart, container recreate) | ✅ | ✅ both switches logged out on stop | ✅ |
+| Outage → offline in UniFi → automatic recovery | ✅ (Python version, collector stopped: informs paused after 90 s, controller showed *disconnected* ~2 min later, reconnected ~15 s after restart) | ✅ (Python version) | ✅ |
+| Session displaced by web-UI login (GS116Ev2) → yield → recover | ✅ shown disconnected during the yield | ✅ displaced, informs paused after 90 s, recovered after the 5-minute yield | ✅ |
 | Counter reset handling | – | ⚠️ not tested: counters were never cleared on the switches | ✅ |
 | 64-bit counters (> 4 GiB) | – | ✅ GS116Ev2 (25 GB counters); GS308Ev4 only from the library's recorded GS108Ev4 pages | ✅ |
-| Declared topology between the two switches (`downlink_table`) | ✅ (mock pair) | – | ✅ |
+| Declared topology between the two switches (`downlink_table`) | ✅ (mock pair, Python version) | – | ✅ |
 | Controller provisioning captured | ✅ VLANs, PVID, disable, speed | – | ✅ |
-| **Port configuration from UniFi applied to hardware** (opt-in; live-tested on port 4, whole switch in dry run) | ✅ VLAN create/delete, access port, trunk with custom tagged VLANs, native VLAN, disable, forced speed, name; provisioning → connected | ✅ both models, verified by read-back; drift corrected | ✅ |
-| Current VLAN configuration (read-only, collector API) | – | ✅ GS308Ev4 (802.1Q advanced, VLAN 1 + 1234); not available for GS116Ev2 | ✅ |
+| **Port configuration from UniFi applied to hardware** (opt-in; live-tested on ports 4/5, whole switch in dry run) | ✅ VLAN create/delete, access port, trunk with custom tagged VLANs (Python version), native VLAN, disable, forced speed, name, switch name; provisioning → connected | ✅ both models, verified by read-back; drift corrected | ✅ |
+| Re-adopting a switch configured outside UniFi | ✅ UniFi imports nothing (see §6) | ✅ GS308Ev4 (Python version) | – |
 | Forget in UniFi (`setdefault`) → pending | – | – | ✅ fake controller only |
 | UI rendering | ⚠️ verified through the controller API that feeds the UI, not by visual inspection | | |
 
@@ -64,48 +70,63 @@ application, but its version may differ from 10.6.109.
 |---|---|---|
 | **unifi-emu** (MIT) | Go module dependency, `inform` package **unmodified** | Correct TNBU/AES-CBC/AES-GCM/zlib implementation, adoption state machine handling both key-delivery channels, and a model registry with 400+ profiles. Its device loop has no hook for live data and no persistence, so we drive `inform.Session` directly: `BuildPayload` → overlay live tables → `Packet.Encode(GCM)` → `Apply`. Persisted state is restored by replaying set-adopt/setparam/setstate through the public `Apply` API. A unit test pins that behaviour. |
 | **unifi-stubd** (AGPL-3.0) | Reference only | Richer payload (mac_table, lldp_table, uplink, if_table) and good protocol notes, but copying code would make this project AGPL, and it targets Linux bridge observation. Field names were cross-checked against it. |
-| **py-netgear-plus** (Apache-2.0) | Wrapped by the collector, pinned to `552b041` | Autodetection, per-model login hashing, cookie handling and page parsers for both models. Main-branch commit chosen over 0.7.0 for `MaxSessionsError` and GS116Ev2 port descriptions. |
+| **py-netgear-plus** (Apache-2.0) | Used by the first (Python) version, pinned to `552b041`; now replaced | Its model detection, login hashing (MD5 merge / HMAC-MD5) and status-page layouts for the two models were reimplemented in Go (`internal/netgear`), with its fixes and gaps (§4) built in. Only two models are needed, which made a dependency on a Python runtime and on library internals hard to justify. |
 
-Two small services, no other infrastructure: the collector (Python, because
-the library is Python) serves normalized JSON. The emulator (Go, because
-unifi-emu is Go) polls it. The physical identity (`source:`) and virtual
-identity (`unifi:`) are separate sections of one config file. The virtual
-device's MAC is configurable: the NETGEAR's own MAC (`physical`, see §6 for
-why) or a derived locally administered one (`auto`).
+One Go program, no other infrastructure. Per NETGEAR it runs a poller
+(reads the switch, derives rates, applies UniFi configuration between reads
+on the same session) and a virtual UniFi device (informs the controller).
+They share state in memory; there is no internal API. Dependencies:
+unifi-emu, `golang.org/x/net/html` and `gopkg.in/yaml.v3`. The physical
+identity (`source:`) and virtual identity (`unifi:`) are separate sections
+of one config file. The virtual device's MAC is configurable: the NETGEAR's
+own MAC (`physical`, see §6 for why) or a derived locally administered one
+(`auto`).
 
 ## 4. Findings about py-netgear-plus (worth reporting upstream)
+
+All of these are handled in the Go implementation.
 
 1. **GS108Ev4/GS308Ev4 byte counters wrap at 4 GiB.** The statistics page
    carries every counter as two 32-bit words (`hi, lo`). The parser reads only
    `lo` (`data[1]`, `data[3]`, `data[5]`). The library's own GS108Ev4 fixtures
-   show `hi=25` constant while `lo` grows. Fixed locally in
-   `collector/.../netgear_pages.py::gs108ev4_counters`.
+   show `hi=25` constant while `lo` grows. Handled in
+   `internal/netgear/gs308ev4.go::gs308Counters`.
 2. **`get_switch_infos()` is lossy.** It converts counters to MB rounded to
-   10 kB and applies filters. The collector therefore uses the parsers
-   directly and keeps raw bytes ("real reported units": bytes on both models).
+   10 kB and applies filters. Raw bytes are kept ("real reported units":
+   bytes on both models).
 3. **GS116Ev2 session loss is not detected.** A displaced session gets HTTP
    200 with `parent.location.href='/login.htm'`. `_is_authenticated` checks
    only for a "redirect to login" title and `/wmi/login`, so the library
-   raises a parse error instead of logging in again. The collector detects
-   this page.
-4. Library DEBUG logs contain session cookies and request parameters. The
-   collector pins the library logger to INFO unless `LIBRARY_DEBUG=1`.
+   raises a parse error instead of logging in again. This page is detected
+   and the poller yields instead of logging the web-UI user out.
+4. Library DEBUG logs contain session cookies and request parameters
+   (including the password hash). The Go version logs method, path, status
+   and duration only.
 5. **The GS308Ev4 is the same web-UI generation as the GS30x series.** Its
    `vlan.cgi` page is parsed correctly by the library's GS30x VLAN parser,
-   although the library gives the GS308Ev4 no VLAN templates. The collector
-   uses that page read-only. The GS30x VLAN/PVID/port write templates are
-   therefore strong candidates for the GS308Ev4 (unverified; writes were not
-   attempted).
+   although the library gives the GS308Ev4 no VLAN templates. The GS30x
+   VLAN/PVID/port write protocol works on the GS308Ev4 (verified, see
+   [CONFIG-WRITE.md](CONFIG-WRITE.md)).
 6. Firmware: GS308Ev4 **V1.0.1.9** (library documents 1.0.1.3) parsed
    correctly for model, firmware, serial, MAC, link, speed, duplex and
    counters. No differences found in the pages used here.
+7. **GS116Ev2 logout does not work.** The library posts `logout.cgi`, which
+   the GS116Ev2 answers with 404. Its web UI logs out by posting the
+   `logoutBtn` form to `index.htm` (verified: the old session cookie is
+   rejected afterwards).
+8. **GS116Ev2 error responses stall.** The switch sends the headers of a
+   404 at once but keeps the body open until a timeout; the library avoids
+   this by not reading non-200 bodies, which the Go version does too.
+9. **GS308Ev4 session cookie.** The `SID` value contains characters such as
+   `\` that strict cookie parsers (Go's `net/http`) drop; it must be handled
+   verbatim.
 
 ## 5. Model profiles
 
 The controller derives PoE presence from each port's reported `poe_caps`.
 With `poe_caps=0` it stores no PoE fields at all (verified). The port
 editor's speed options come from each port's reported `speed_caps`, which the
-emulator sets per NETGEAR model (see below). The model code mainly drives the
+integration sets per NETGEAR model (see below). The model code mainly drives the
 device image and name. Both switches use the USW Lite line, so they look
 alike in UniFi.
 
@@ -146,29 +167,38 @@ not done yet.
 | Topology between the two NETGEARs | ✅ opt-in | Works when declared (`unifi.downlinks`): the controller builds `downlink_table` from the declared `mac_table` entry (verified on the mock pair). Not auto-detected. |
 | Packet counts, errors other than CRC, broadcast/multicast | H | Only rx/tx bytes and CRC errors are exposed (CRC is reported as `rx_errors`). |
 | Duplex on GS116Ev2 | H | Not reported. Only ≥ 1 Gbit/s links are reported full duplex (1000BASE-T half duplex does not occur in practice); otherwise the field is omitted. |
-| CPU, memory, temperature, fan | H | Not exposed. The emulator removes unifi-emu's placeholder values instead of showing them. |
+| CPU, memory, temperature, fan | H | Not exposed. The integration removes unifi-emu's placeholder values instead of showing them. |
 | Switch uptime | H | Not exposed. `uptime` is the virtual device's persisted boot time. |
 | PoE | H | Not PoE switches. |
 | Configuration from UniFi beyond VLAN/native VLAN/disable/speed/name | P/H | LAG, STP, storm control, 802.1X, mirroring, isolation: not mapped. Forced 1000 Mbit/s is not offered by either switch; half duplex is not offered by the GS308Ev4. See [CONFIG-WRITE.md](CONFIG-WRITE.md). |
 | Locate/LED, reboot, port power-cycle, SSH, debug console, speed test | P/I | Commands are ignored or emulated. |
-| Features gated on genuine capability bitmaps (mirroring, LAG, STP tuning, storm control, 802.1X, routing) | P | The emulator reports placeholder `fw_caps`. UniFi may still offer some settings; they are recorded, not applied. |
+| Features gated on genuine capability bitmaps (mirroring, LAG, STP tuning, storm control, 802.1X, routing) | P | The virtual device reports placeholder `fw_caps`. UniFi may still offer some settings; they are recorded, not applied. |
 | Discovery (L2 broadcast) | I (not needed) | Adoption works through inform alone. |
 | Long-term statistics graphs | not verified | The controller receives correct counters and rates; history was not observed over hours. |
 
 Operational caveats:
 
-- The GS116Ev2 allows one web session. The collector yields for
+- The GS116Ev2 allows one web session. The service yields for
   `session_yield_seconds` (300 s) when displaced, and UniFi shows the switch
   offline meanwhile.
 - With `ip: physical` UniFi shows the NETGEAR's IP. SSH/"open device"
   actions from UniFi will not work.
+- UniFi never reads configuration from a device; it only shows status. Verified
+  by re-adopting the GS308Ev4 after configuring it in its own web UI (VLANs
+  100/200, PVID, port name, disabled port, static IP): UniFi showed DHCP,
+  only the Default network and default port settings, ignored the reported
+  port name, and did not show the disabled port anywhere. With writes on,
+  UniFi's defaults would have replaced the switch's configuration, as with a
+  native UniFi switch.
+- IP settings (DHCP/static) changed in UniFi are acknowledged but never
+  applied; UniFi then shows settings the switch does not have.
 
 ## 7. Next steps
 
 1. Run the procedure in [TESTING.md](TESTING.md) yourself, including an
    unplugged-cable test. Then decide on DR7 deployment
    ([DEPLOYMENT.md](DEPLOYMENT.md)).
-2. Report findings 1–3 and 5 of §4 upstream to py-netgear-plus.
+2. Report findings 1–3, 5 and 7 of §4 upstream to py-netgear-plus.
 3. Optional topology improvement: read the DR7's client list through the
    controller API to find the NETGEAR physical MAC on a DR7 port. That would
    at least let the uplink port be declared automatically. This needs
@@ -182,8 +212,8 @@ Operational caveats:
 **Implemented** for VLAN creation/deletion, tagged/untagged membership,
 PVID/native VLAN, port enable/disable, port speed (within each switch's
 options) and port names, on both models. The write protocols were
-recovered from the switches' own web-UI JavaScript and verified on port 4 of
-each switch. The GS308Ev4 uses the GS30x protocol that py-netgear-plus
+recovered from the switches' own web-UI JavaScript and verified on ports 4
+and 5 of each switch. The GS308Ev4 uses the GS30x protocol that py-netgear-plus
 implements for other models; the GS116Ev2's JGS form protocol was
 reverse-engineered.
 

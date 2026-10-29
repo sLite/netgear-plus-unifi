@@ -38,8 +38,7 @@ switches:
 Watch the plan before going live:
 
 ```sh
-docker compose exec collector python -c "import urllib.request,json; \
-  [print(s['id'], s['config_sync']) for s in json.load(urllib.request.urlopen('http://127.0.0.1:8099/v1/switches'))['switches']]"
+curl -s 127.0.0.1:8098/status   # see config_sync per switch
 ```
 
 `config_sync.state` is one of `disabled`, `waiting`, `pending`, `dry_run`,
@@ -49,18 +48,20 @@ and `last_error`.
 ## How it works
 
 ```
-UniFi ──setparam.system_cfg──▶ emulator ──POST /v1/switches/<id>/config──▶ collector
-            (switch.* lines,               (cfgversion + switch section,   │ parse → desired
-             secrets removed)               persisted, re-delivered)        │ read switch → actual
-                                                                            │ plan (all ports)
-UniFi ◀──cfgversion acknowledged── emulator ◀──processed_cfgversion──────── │ apply + read-back verify
+UniFi ──setparam.system_cfg──▶ UniFi device ──switch section──▶ sync (on the poller)
+            (switch.* lines,    (internal/device)  (persisted)  │ parse → desired
+             secrets removed)                                    │ read switch → actual
+                                                                 │ plan (all ports)
+UniFi ◀──cfgversion acknowledged── UniFi device ◀──processed──── │ apply + read-back verify
 ```
 
 1. UniFi sends switch configuration as `setparam.system_cfg`, a flat
    `key=value` document (see [captures/](captures/system_cfg-switch-section.txt)).
-   The emulator keeps only `switch.*` lines, drops credentials
-   (`switch.wevent.key`), persists them and hands them to the collector.
-2. The collector resolves UniFi's VLAN defaults and per-port overrides into an
+   The UniFi device keeps only `switch.*` lines and the hostname, drops
+   credentials (`switch.wevent.key`), persists them with its adoption state
+   and hands them to the switch's sync. After a restart the stored
+   configuration is handed over again, so the switch is re-verified.
+2. The sync (`internal/provision`) resolves UniFi's VLAN defaults and per-port overrides into an
    explicit membership per (VLAN, port) for every port, reads the switch, and
    diffs the two. Ordering keeps ports connected: add memberships → move PVIDs
    → remove memberships → delete VLANs that UniFi does not define or that no
@@ -68,8 +69,8 @@ UniFi ◀──cfgversion acknowledged── emulator ◀──processed_cfgvers
    covering all ports.
 3. Each operation is applied on the polling session (one switch session, no
    overlap with reads) and verified by reading back.
-4. The emulator reports the new `cfgversion` to UniFi only after the collector
-   has processed it. UniFi therefore shows *provisioning* (device state 5)
+4. The UniFi device reports the new `cfgversion` to UniFi only after the
+   sync has processed it. UniFi therefore shows *provisioning* (device state 5)
    while the NETGEAR is being configured, as with a native switch. The hold is
    capped at 2 minutes.
 
@@ -90,7 +91,8 @@ will cut off management access. Review the dry-run plan first.
 
 ## Wire protocols (taken from the switches' own web-UI code)
 
-**GS308Ev4**: same CGI generation as the GS30x series in py-netgear-plus.
+**GS308Ev4**: same CGI generation as the GS30x series supported by
+py-netgear-plus.
 The packed JavaScript was decoded offline.
 
 | Operation | Request |
@@ -131,9 +133,19 @@ must be read immediately before posting. Field order is `submitId … submitEnd`
 
 ## Verified on hardware (2026-10-29)
 
-Live writes were tested on **port 4 of both switches only**, because the
+Live writes were tested on **ports 4 and 5 of both switches**, because the
 switches carry a home network. That restriction was a test-harness measure,
-not part of the product.
+not part of the product. First with the Python collector, then again with
+the Go implementation:
+
+- Go, end to end via UniFi: network creation (VLAN tagged on every port of
+  both switches), access port in VLAN 3901 (join, PVID, leave VLAN 1, in that
+  order), forced 100 full with a port name on both switches, disable
+  (GS308Ev4), 10 half (GS116Ev2), switch rename on both (GS116Ev2 IP
+  settings verified unchanged), drift on both switches corrected after a
+  restart, revert to defaults and VLAN deletion.
+
+Earlier, with the Python collector:
 
 - Direct writer tests: VLAN create/edit/delete, access port in VLAN 3901
   (including removing port 4 from VLAN 1 while all other ports stayed

@@ -1,30 +1,25 @@
-# Shared configuration for netgear-plus-unifi.
+# Configuration for netgear-plus-unifi.
 #
 # Each switch has two sections:
-#   source: the PHYSICAL NETGEAR switch (read by the collector; written only
-#           if source.write is enabled)
-#   unifi:  the VIRTUAL UniFi device (presented by the emulator); its MAC is
+#   source: the PHYSICAL NETGEAR switch (polled; written only if
+#           source.write is enabled)
+#   unifi:  the VIRTUAL UniFi device presented to the controller; its MAC is
 #           either the NETGEAR's own (mac: physical) or a derived virtual one.
 # Passwords never go in this file: source.password_env names the environment
 # variable that holds it.
 
-collector:
-  listen: "0.0.0.0:8099"          # internal API used by the emulator
-  poll_interval_seconds: 15       # default per-switch polling interval
-  stale_after_seconds: 90         # snapshot older than this = unavailable
-  state_dir: "/data"              # provisioning state (VLANs created by this integration)
-
-emulator:
-  # Controller inform endpoint. Disposable test controller (docker-compose.test.yml):
-  #   http://unifi-controller:8080/inform
+controller:
+  # Controller inform endpoint (an IP, not a hostname). Disposable test
+  # controller (docker-compose.test.yml): http://172.29.0.10:8080/inform
   # Dream Router 7 (only after explicit approval, see docs/DEPLOYMENT.md):
   #   http://192.168.1.1:8080/inform
-  inform_url: "http://unifi-controller:8080/inform"
-  collector_url: "http://collector:8099"
-  state_dir: "/data"              # adoption state, contains auth keys (0600)
-  inform_interval_seconds: 10     # controller may retune this
-  telemetry_poll_seconds: 5
-  stale_after_seconds: 90         # stop informing -> UniFi shows switch offline
+  # The UNIFI_INFORM_URL environment variable overrides this.
+  inform_url: "http://172.29.0.10:8080/inform"
+  inform_interval_seconds: 10     # the controller may retune this
+
+poll_interval_seconds: 15         # default per-switch polling interval
+stale_after_seconds: 90           # older telemetry: stop informing, UniFi shows the switch offline
+state_dir: "/data"                # adoption state, contains auth keys (0600)
 
 switches:
   - id: gs308ev4                  # stable id; renaming it creates a new virtual device
@@ -33,10 +28,10 @@ switches:
       host: 192.168.1.247
       password_env: NETGEAR_GS308EV4_PASSWORD
       expected_model: GS308Ev4    # refuse to report data if another model answers
-      poll_interval_seconds: 15
+      # session_yield_seconds: 300  # pause after a web UI login displaced our session
       # Let UniFi manage this switch's ports (VLANs, native VLAN, disable,
-      # speed, name), like a native UniFi switch. Off unless enabled;
-      # dry_run only logs the plan. Review the plan before going live.
+      # speed, name) and its name, like a native UniFi switch. Off unless
+      # enabled; dry_run only logs the plan. Review the plan before going live.
       write:
         enabled: false
         dry_run: true
@@ -60,7 +55,7 @@ switches:
         enabled: false
         dry_run: true
     unifi:
-      model: USL16LP              # UniFi Switch Lite 16 PoE: 16x GE; PoE reported absent
+      model: USL16LP              # USW Lite 16 PoE: 16x GE; PoE reported absent
       mac: physical
       name: "GS116Ev2"
       ip: physical

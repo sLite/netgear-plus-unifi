@@ -1,4 +1,4 @@
-# netgear-plus-unifi: NETGEAR Plus switches as (read-only) UniFi switches.
+# netgear-plus-unifi: NETGEAR Plus switches as UniFi switches.
 #
 #   cp .env.example .env && cp config/switches.example.yaml config/switches.yaml
 #   docker compose up -d --build                     # against the controller in switches.yaml
@@ -7,31 +7,19 @@
 name: netgear-plus-unifi
 
 services:
-  collector:
-    build: ./collector
+  netgear-unifi:
+    build: .
     restart: unless-stopped
-    env_file: .env # NETGEAR_*_PASSWORD; only this service receives switch credentials
+    env_file: .env # NETGEAR_*_PASSWORD
     environment:
       CONFIG_FILE: /config/switches.yaml
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      UNIFI_INFORM_URL: ${UNIFI_INFORM_URL:-} # empty = controller.inform_url from the config
     volumes:
       - ${SWITCHES_CONFIG:-./config/switches.yaml}:/config/switches.yaml:ro
-      - collector-state:/data
-
-  emulator:
-    build: ./emulator
-    restart: unless-stopped
-    depends_on: [collector]
-    environment:
-      CONFIG_FILE: /config/switches.yaml
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      UNIFI_INFORM_URL: ${UNIFI_INFORM_URL:-} # empty = emulator.inform_url from the config
-    volumes:
-      - ${SWITCHES_CONFIG:-./config/switches.yaml}:/config/switches.yaml:ro
-      - emulator-state:/data
+      - state:/data
     ports:
       - "127.0.0.1:8098:8098" # read-only status endpoint
 
 volumes:
-  emulator-state: # adoption state incl. controller auth keys; `docker compose down -v` removes it
-  collector-state: # provisioning state (owned VLANs, last applied UniFi configuration)
+  state: # adoption state incl. controller auth keys; `docker compose down -v` removes it

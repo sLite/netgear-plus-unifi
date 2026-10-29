@@ -1,5 +1,5 @@
 # UniFi Network 10.6.109 -> emulated USL16LP (virtual GS116Ev2), setparam.system_cfg
-# switch section only, secrets redacted by the emulator. Port overrides set in the
+# switch section only, secrets redacted. Port overrides set in the
 # test controller for this capture:
 #   port 3: native VLAN 20, block all tagged      (access port)
 #   port 4: native Default, tagged all except 30  (trunk)

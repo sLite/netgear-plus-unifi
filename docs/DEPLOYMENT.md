@@ -35,7 +35,7 @@
   port `tcp/8080`.
 - The DR7 must accept informs from that host. This is the default on the LAN;
   check firewall rules if the host is in another VLAN.
-- No inbound ports are needed. The emulator status endpoint is bound to
+- No inbound ports are needed. The status endpoint is bound to
   `127.0.0.1:8098`.
 
 ## Steps
@@ -46,9 +46,9 @@
    ```sh
    cp .env.example .env && chmod 600 .env       # NETGEAR passwords
    cp config/switches.example.yaml config/switches.yaml
-   # set emulator.inform_url: "http://192.168.1.1:8080/inform"
+   # set controller.inform_url: "http://192.168.1.1:8080/inform"
    ```
-3. If you tested before, start from clean adoption state. The emulator also
+3. If you tested before, start from clean adoption state. The service also
    discards stale state automatically when the inform URL changes:
    ```sh
    docker compose down -v
@@ -57,7 +57,7 @@
    ```sh
    unset COMPOSE_FILE
    docker compose up -d --build
-   docker compose logs -f emulator    # wait for "pending adoption"
+   docker compose logs -f netgear-unifi    # wait for "pending adoption"
    ```
 5. In UniFi Network on the DR7: UniFi Devices → the two switches show
    *Pending Adoption*. Click **Adopt** on each. Adopt them one after the
@@ -65,8 +65,10 @@
 6. In each device's settings, disable automatic firmware updates for these
    devices (or globally) and leave port profiles at default.
 7. Optional topology: if you know the cabling, declare it in
-   `config/switches.yaml` (`unifi.downlinks` between the two NETGEARs). An
-   uplink to the DR7 itself cannot be drawn (see the report).
+   `config/switches.yaml` (`unifi.downlinks` between the two NETGEARs). The
+   uplink to the DR7 is not declared: with `unifi.mac: physical` UniFi may
+   place the switches itself, because the DR7 sees their MACs on its ports
+   (not verified yet, see the report).
 
 ## Removal
 
@@ -74,22 +76,36 @@
 2. `docker compose down -v` (removes containers and adoption state including
    the auth keys).
 
-The NETGEAR switches need no cleanup: nothing on them was changed. If you
-logged into a switch's web UI during operation, the collector simply logged in
-again afterwards.
+With writes disabled (the default) the NETGEAR switches need no cleanup:
+nothing on them was changed. With writes enabled they keep the last
+configuration UniFi applied (VLANs, PVIDs, port settings, name); forgetting
+the device does not revert it. Reset those settings in UniFi before
+forgetting the device, or change them in the NETGEAR web UI afterwards.
 
 ## Updating
 
 `git pull && docker compose up -d --build`. Adoption state lives in the
-`emulator-state` volume and survives image rebuilds.
+`state` volume and survives image rebuilds.
+
+Coming from the earlier two-service version (Python `collector` + Go
+`emulator`): move `emulator.inform_url` to `controller.inform_url` and the
+other settings as described in the [changelog](../CHANGELOG.md), forget the
+devices in UniFi, run `docker compose down -v --remove-orphans`, then start
+and adopt again. Adoption state is not migrated.
 
 ## Operating notes
 
 - The GS116Ev2 allows a single web session. While you use its web UI, the
-  collector backs off (`session_yield_seconds`, default 300 s) and UniFi
+  service backs off (`session_yield_seconds`, default 300 s) and UniFi
   shows the switch offline. The GS308Ev4 accepts concurrent sessions.
 - If the NETGEAR is unreachable for more than 90 s, the virtual switch stops
   informing and UniFi marks it disconnected. It recovers by itself.
 - Not tested: controller backup/restore and controller migration. If
-  devices fall back to pending afterwards, run `ngu-emulator reset <id>` and
-  adopt them again.
+  devices fall back to pending afterwards, run `docker compose exec
+  netgear-unifi netgear-unifi reset <id>` and adopt them again.
+- Replacing the DR7 without a backup: the new controller does not know the
+  devices. Before re-adopting, set `dry_run: true` (or disable writes):
+  a fresh controller pushes its defaults ("Allow All" with only the networks
+  that exist on it), which would delete VLANs not yet recreated. Recreate
+  networks and port settings in UniFi, check `config_sync.last_plan`, then
+  go live again.
