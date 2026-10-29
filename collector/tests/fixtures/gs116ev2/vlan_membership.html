@@ -1,0 +1,573 @@
+﻿<!DOCTYPE html>
+<html>
+	<head><meta name="format-detection" content="telephone=no,email=no,address=no">
+		<title>Status</title>
+		<meta http-equiv="content-type" content="text/html; charset=utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+		<link type="text/css" href="../css/func_page_layout.css" rel="stylesheet">
+        <style type="text/css">
+        .tableHeader_ui{background-color:#8AD5F6; border-collapse:collapse; font-size:10pt; font-family:Arial;width: 900px;}
+        .tableHeader_ui table{}
+        .tableHeader_ui table td{padding:2px 2px 2px 2px;}
+        .tableData_ui{border:1px #FFFFFF none; overflow:auto; max-height:462px; overflow-x:hidden; font-size:10pt; font-family:Arial;}
+        .tableData_ui table{max-height:400px;}
+        .tableData_ui table td{padding:2px 2px 2px 2px;} 
+        .portText{font-size: 10pt; margin-top: -22px;}
+        .mTop10{margin-top:10px;}
+        .selStyle{float:right ; width:220px; margin-left:5px;}
+		</style>
+        
+<script type="text/javascript" language="JavaScript">
+var helpIcon = '../images/icon_help_contentlevel.png';
+
+var secureRand = 'ABCDEF01';var portNum = 16;var vlanMem = '1?U?U?U?U?U?U?U?U?U?U?U?U?U?U?U?U';var vlanMemEntry = vlanMem.split(',');var pvid = '1?1?1?1?1?1?1?1?1?1?1?1?1?1?1?1';var groupNum = 8;var lagMemEntry = new Array();lagMemEntry[0]='1?Disable?';
+lagMemEntry[1]='2?Disable?';
+lagMemEntry[2]='3?Disable?';
+lagMemEntry[3]='4?Disable?';
+lagMemEntry[4]='5?Disable?';
+lagMemEntry[5]='6?Disable?';
+lagMemEntry[6]='7?Disable?';
+lagMemEntry[7]='8?Disable?';
+
+var vlanMemOption = '';
+for(var i=0; i<vlanMemEntry.length; i++)
+{
+    var tmp = vlanMemEntry[i].split('?');
+    vlanMemOption += tmp[0];
+    if(i < vlanMemEntry.length - 1)
+    {
+        vlanMemOption += '?';
+    }
+}
+var groupOptOption = '?'+parent.Vlan0014+'?'+parent.Vlan0015+'?'+parent.Vlan0016;
+var groupOptOptionValue = '?Untag All?Tag All?Remove All';
+var memStatus = '';
+</script>
+
+<script type="text/javascript" language="JavaScript">
+var blankImg        = '';
+var tagImg          = '';
+var tagHoverImg     = '';
+var untagImg        = '';
+var untagHoverImg   = '';
+var blandImgId      = 'Img1';
+var blandImgHoverId = 'Img2';
+var tagImgId        = 'Img3';
+var tagHoverImgId   = 'Img4';
+var untagImgId      = 'Img5';
+var untagHoverImgId = 'Img6';
+function init()
+{
+    // List VLAN configuration of LAG ID 1
+    var vlanMems = vlanMemEntry[0].split('?');
+    var hit = 0; 
+    memStatus = '';
+    
+    // Update VLAN membership configuration
+    for(var j=1; j<=portNum; j++)
+    {
+        document.getElementById('port' + j + blandImgId).setAttribute('style', 'display: block;');
+        document.getElementById('port' + j + blandImgHoverId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + j + tagImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + j + tagHoverImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + j + untagImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + j + untagHoverImgId).setAttribute('style', 'display: none;');
+        
+        if(vlanMems[j] != '')
+        {
+            if(vlanMems[j] == 'T')
+            {
+                document.getElementById('port' + j + blandImgId).setAttribute('style', 'display: none;');
+                document.getElementById('port' + j + blandImgHoverId).setAttribute('style', 'display: none;');
+                document.getElementById('port' + j + tagImgId).setAttribute('style', 'display: block;');
+                document.getElementById('port' + j + tagHoverImgId).setAttribute('style', 'display: none;');
+                document.getElementById('port' + j + untagImgId).setAttribute('style', 'display: none;');
+                document.getElementById('port' + j + untagHoverImgId).setAttribute('style', 'display: none;');
+                memStatus += 'T';
+            }
+            else
+            {
+                document.getElementById('port' + j + blandImgId).setAttribute('style', 'display: none;');
+                document.getElementById('port' + j + blandImgHoverId).setAttribute('style', 'display: none;');
+                document.getElementById('port' + j + tagImgId).setAttribute('style', 'display: none;');
+                document.getElementById('port' + j + tagHoverImgId).setAttribute('style', 'display: none;');
+                document.getElementById('port' + j + untagImgId).setAttribute('style', 'display: block;');
+                document.getElementById('port' + j + untagHoverImgId).setAttribute('style', 'display: none;');
+                memStatus += 'U';
+            }
+        }
+        else
+        {
+            memStatus += '0';
+        }
+        
+        if(j < vlanMems.length)
+        {
+            memStatus += '?';
+        }
+    }
+    
+    // Enable VLAN ID selector
+    document.getElementById('selVidSel').disabled = '';
+    document.getElementById('selGOperSel').disabled = '';
+    
+    checkPreviousConf();
+    
+    // Calculate content height
+    var cheight = 0;
+    cheight += document.getElementById('vlanMemBlk').offsetHeight;
+    
+     // Update min-height of content
+    document.getElementsByTagName('html')[0].setAttribute('style', 'overflow: auto; overflow-x: hidden; min-height: ' + cheight + 'px;');
+    
+    //var cwidth = 740;
+    // Update min-width of HTML
+    //window.parent.document.getElementsByTagName('html')[0].setAttribute('style', 'overflow: auto; overflow-y: hidden; min-width: ' + (cwidth + 257) + 'px;');
+}
+
+function checkPreviousConf()
+{
+	var url = window.location.toString();
+	
+	if (url.indexOf('?') != -1)
+	{
+		var ary = url.split('?')[1];	
+	    document.getElementById('selVidSel').value = ary;
+	    
+	    for(var i=0; i<vlanMemEntry.length; i++)
+	    {
+	        var vidIndex = vlanMemEntry[i].split('?')[0];
+	        if(vidIndex == ary)
+	        {
+	            changeVlanId(i);
+	        }
+	    }
+		
+		// Disable button on control bar
+        document.getElementById('btnApply').className = 'unclickbtnStyle';
+        document.getElementById('btnApply').setAttribute('href', 'javascript:void(0)');
+
+        // Disable button on control bar
+        document.getElementById('btnCancel').className = 'unclickbtnStyle';
+        document.getElementById('btnCancel').setAttribute('href', 'javascript:void(0)');
+	}
+	else
+	{
+	    changeVlanId(0);
+	    
+	    // Disable button on control bar
+        document.getElementById('btnApply').className = 'unclickbtnStyle';
+        document.getElementById('btnApply').setAttribute('href', 'javascript:void(0)');
+
+        // Disable button on control bar
+        document.getElementById('btnCancel').className = 'unclickbtnStyle';
+        document.getElementById('btnCancel').setAttribute('href', 'javascript:void(0)');
+	}
+}
+
+function submitForm()
+{   
+    var ele = parent.createDivEle('tmp', '', '');
+    var vid = document.getElementById('selVidSel').value;
+    var member = 0, tagMember = 0;
+    var pvidArr = pvid.split('?');
+    var memArr = memStatus.split('?');
+    var GroupMemArr =new Array();
+    
+    for(var portIndex=1; portIndex<=portNum; portIndex++)
+    {
+        if(memArr[portIndex - 1] != '0')
+        {
+            member += (1 << portIndex);
+			GroupMemArr[portIndex-1] = memArr[portIndex - 1];
+        }
+        
+        if(memArr[portIndex - 1] == 'T')
+        {
+            tagMember += (1 << portIndex);
+        }
+    }
+	
+	if(checkConfig(memArr) == 0)
+	{
+		return;
+	}
+
+	for(var portIndex=1; portIndex<=portNum; portIndex++)
+    {
+        if(memArr[portIndex - 1] == '0')
+        {
+            if(pvidArr[portIndex - 1] == document.getElementById('selVidSel').value)
+            {
+                parent.showDialogWithAlert(parent.Vlan0002, parent.ErrorCode0067_1 + portIndex + parent.ErrorCode0067_2);
+                return;
+            }
+        }
+    }
+	
+    ele.appendChild(parent.createInputEle('vid', 'vid', 'hidden', '', vid, '', ''));
+    ele.appendChild(parent.createInputEle('member', 'member', 'hidden', '', member, '', ''));
+    ele.appendChild(parent.createInputEle('tag', 'tag', 'hidden', '', tagMember, '', ''));
+
+	// Disable input texts to prevent submission
+    document.getElementById('selVidSel').disabled = 'disabled';
+    document.getElementById('selGOperSel').disabled = 'disabled';
+	
+    // Create hidden inputs
+    document.getElementById('vlanMemBlkBArea').appendChild(ele);
+    document.getElementById('formArea').submit();    
+}
+
+function checkConfig(GroupMemArr)
+{
+	// Check Trunk
+	for(var lagId=0; lagId<groupNum; lagId++)
+	{
+		var lagMems = (lagMemEntry[lagId].split('?'))[2].split(',');
+    	var cmpBaseVlan = GroupMemArr[lagMems[0] - 1];
+		var admin = lagMemEntry[lagId].split('?')[1];
+
+		if(admin == parent.System0013)
+			continue;
+		for(var i=1; i<lagMems.length; i++)
+		{
+			var cmpTargetVlan = GroupMemArr[lagMems[i] - 1];
+           
+			if(cmpBaseVlan != cmpTargetVlan)
+			{
+				parent.showDialogWithAlert(parent.Vlan0002, parent.ErrorCode0068);
+				return 0;
+			}
+		}
+	}	
+	return 1;
+}
+
+function refreshPage()
+{
+    window.location.reload()
+}
+
+function changeVlanId(index)
+{
+    // List VLAN configuration of LAG ID 1
+    var vlanMems = vlanMemEntry[index].split('?');
+    memStatus = '';
+    
+    enableControl();
+    
+    // Update VLAN membership configuration
+    for(var j=1; j<=portNum; j++)
+    {
+        document.getElementById('port' + j + blandImgId).setAttribute('style', 'display: block;');
+        document.getElementById('port' + j + tagImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + j + tagHoverImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + j + untagImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + j + untagHoverImgId).setAttribute('style', 'display: none;');
+        if(vlanMems[j] != '')
+        {
+            if(vlanMems[j] == 'T')
+            {
+                document.getElementById('port' + j + blandImgId).setAttribute('style', 'display: none;');
+                document.getElementById('port' + j + tagImgId).setAttribute('style', 'display: block;');
+                document.getElementById('port' + j + tagHoverImgId).setAttribute('style', 'display: none;');
+                document.getElementById('port' + j + untagImgId).setAttribute('style', 'display: none;');
+                document.getElementById('port' + j + untagHoverImgId).setAttribute('style', 'display: none;');
+                memStatus += 'T';
+            }
+            else
+            {
+                document.getElementById('port' + j + tagImgId).setAttribute('style', 'display: none;');
+                document.getElementById('port' + j + blandImgId).setAttribute('style', 'display: none;');
+                document.getElementById('port' + j + tagHoverImgId).setAttribute('style', 'display: none;');
+                document.getElementById('port' + j + untagImgId).setAttribute('style', 'display: block;');
+                document.getElementById('port' + j + untagHoverImgId).setAttribute('style', 'display: none;');
+                memStatus += 'U';
+            }
+        }
+        else
+        {
+            memStatus += '0';
+        }
+        
+        if(j < vlanMems.length)
+        {
+            memStatus += '?';
+        }
+    }
+    
+    //
+    document.getElementById('selGOperSel').value = '';
+}
+
+function changeGroupOperation(act)
+{
+    memStatus = '';
+    
+    enableControl();
+    
+    if(act == 'Untag All')
+    {
+        for(var i=0; i<portNum; i++)
+        {
+            var portIndex = i + 1;
+            document.getElementById('port' + portIndex + blandImgId).setAttribute('style', 'display: none;');
+            document.getElementById('port' + portIndex + tagImgId).setAttribute('style', 'display: none;');
+            document.getElementById('port' + portIndex + tagHoverImgId).setAttribute('style', 'display: none;');
+            document.getElementById('port' + portIndex + untagImgId).setAttribute('style', 'display: block;');
+            document.getElementById('port' + portIndex + untagHoverImgId).setAttribute('style', 'display: none;');
+            memStatus += 'U?';
+        }
+    }
+    else if(act == 'Tag All')
+    {
+        for(var i=0; i<portNum; i++)
+        {
+            var portIndex = i + 1;
+            document.getElementById('port' + portIndex + blandImgId).setAttribute('style', 'display: none;');
+            document.getElementById('port' + portIndex + tagImgId).setAttribute('style', 'display: block;');
+            document.getElementById('port' + portIndex + tagHoverImgId).setAttribute('style', 'display: none;');
+            document.getElementById('port' + portIndex + untagImgId).setAttribute('style', 'display: none;');
+            document.getElementById('port' + portIndex + untagHoverImgId).setAttribute('style', 'display: none;');
+            memStatus += 'T?';
+        }
+    }
+    else if(act == 'Remove All')
+    {
+        for(var i=0; i<portNum; i++)
+        {
+            var portIndex = i + 1;
+            document.getElementById('port' + portIndex + blandImgId).setAttribute('style', 'display: block;');
+            document.getElementById('port' + portIndex + tagImgId).setAttribute('style', 'display: none;');
+            document.getElementById('port' + portIndex + tagHoverImgId).setAttribute('style', 'display: none;');
+            document.getElementById('port' + portIndex + untagImgId).setAttribute('style', 'display: none;');
+            document.getElementById('port' + portIndex + untagHoverImgId).setAttribute('style', 'display: none;');
+            memStatus += '0?';
+        }
+    }
+}
+
+function portCheck(port)
+{   
+    var portIndex = port;
+    var portAction = 0;
+    var memStatusArr = memStatus.split('?');
+    
+    enableControl();
+    
+    if(memStatusArr[port - 1] == '0')
+    {
+        document.getElementById('port' + portIndex + blandImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + blandImgHoverId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + tagImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + tagHoverImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + untagImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + untagHoverImgId).setAttribute('style', 'display: block;');
+        portAction = 'U';
+    }
+    else if(memStatusArr[port - 1] == 'U')
+    {
+        document.getElementById('port' + portIndex + blandImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + blandImgHoverId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + tagImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + tagHoverImgId).setAttribute('style', 'display: block;');
+        document.getElementById('port' + portIndex + untagImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + untagHoverImgId).setAttribute('style', 'display: none;');
+        portAction = 'T';
+    }
+    else if(memStatusArr[port - 1] == 'T')
+    {   
+        document.getElementById('port' + portIndex + blandImgId).setAttribute('style', 'display: block;');
+        document.getElementById('port' + portIndex + blandImgHoverId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + tagImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + tagHoverImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + untagImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + untagHoverImgId).setAttribute('style', 'display: none;');
+        portAction = '0';
+    }
+        
+    // rebuild 'memStatus'
+    var memArr = memStatus.split('?');
+    memStatus = '';
+    memArr[port - 1] = portAction;
+    for(var i=0; i<portNum; i++)
+    {
+        if(memArr[i] != '')
+        {
+            memStatus += memArr[i] + '?';
+        }
+        else
+        {
+            memStatus += '?';
+        }
+    }
+}
+
+function mouseOver(port)
+{
+    var portIndex = port;
+    var memStatusArr = memStatus.split('?');
+    
+    if(memStatusArr[port - 1] == 'U')
+    {
+        document.getElementById('port' + portIndex + blandImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + blandImgHoverId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + tagImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + tagHoverImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + untagImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + untagHoverImgId).setAttribute('style', 'display: block;');
+    }
+    else if(memStatusArr[port - 1] == 'T')
+    {
+        document.getElementById('port' + portIndex + blandImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + blandImgHoverId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + tagImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + tagHoverImgId).setAttribute('style', 'display: block;');
+        document.getElementById('port' + portIndex + untagImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + untagHoverImgId).setAttribute('style', 'display: none;');
+    }
+    else if(memStatusArr[port - 1] == 0){
+        document.getElementById('port' + portIndex + blandImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + blandImgHoverId).setAttribute('style', 'display: block;');
+        document.getElementById('port' + portIndex + tagImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + tagHoverImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + untagImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + untagHoverImgId).setAttribute('style', 'display: none;');
+    }
+}
+
+function mouseOut(port)
+{
+    var portIndex = port;
+    var memStatusArr = memStatus.split('?');
+    
+    if(memStatusArr[port - 1] == 'U')
+    {
+        document.getElementById('port' + portIndex + blandImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + tagImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + tagHoverImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + untagImgId).setAttribute('style', 'display: block;');
+        document.getElementById('port' + portIndex + untagHoverImgId).setAttribute('style', 'display: none;');
+    }
+    else if(memStatusArr[port - 1] == 'T')
+    {
+        document.getElementById('port' + portIndex + blandImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + tagImgId).setAttribute('style', 'display: block;');
+        document.getElementById('port' + portIndex + tagHoverImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + untagImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + untagHoverImgId).setAttribute('style', 'display: none;');
+    }
+    else if(memStatusArr[port - 1] == 0){
+        document.getElementById('port' + portIndex + blandImgId).setAttribute('style', 'display: block;');
+        document.getElementById('port' + portIndex + blandImgHoverId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + tagImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + tagHoverImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + untagImgId).setAttribute('style', 'display: none;');
+        document.getElementById('port' + portIndex + untagHoverImgId).setAttribute('style', 'display: none;');
+    }
+}
+function enableControl()
+{
+    // Enable button on control bar
+    document.getElementById('btnApply').className = 'btnStyle';
+    document.getElementById('btnApply').setAttribute('href', 'javascript:submitForm()');
+    
+    // Enable button on control bar
+    document.getElementById('btnCancel').className = 'btnStyle';
+    document.getElementById('btnCancel').setAttribute('href', 'javascript:refreshPage()');
+}
+function disableControl()
+{
+    // Disable button on control bar
+    document.getElementById('btnApply').className = 'unclickbtnStyle';
+    document.getElementById('btnApply').setAttribute('href', 'javascript:void(0)');
+    
+    // Disable button on control bar
+    document.getElementById('btnCancel').className = 'unclickbtnStyle';
+    document.getElementById('btnCancel').setAttribute('href', 'javascript:void(0)');
+    
+    // Disable VLAN ID selector
+    document.getElementById('selVidSel').disabled = 'disabled';
+    document.getElementById('selGOperSel').disabled = 'disabled';
+    
+}
+</script>
+</head>
+
+<body onload="init();">
+	<div id="mainContenter" class="mainContenter">
+        <script type="text/javascript" language='JavaScript'>
+            var data = new Array(), colWidth;
+            //
+            blankImg      = '<img src="../images/PG_Top_Normal.jpg" style="border-style:none;">';
+            blankImgHover = '<img src="../images/PG_Top_Normal_Hover.jpg" style="border-style:none;">';
+            tagImg        = '<img src="../images/PG_Top_Tagged.jpg" style="border-style:none;">';
+            tagHoverImg   = '<img src="../images/PG_Top_Tagged_Hover.jpg" style="border-style:none;">';
+            untagImg      = '<img src="../images/PG_Top_Untagged.jpg" style="border-style:none;">';
+            untagHoverImg = '<img src="../images/PG_Top_Untagged_Hover.jpg" style="border-style:none;">';
+        
+            // Create Submit form
+            mainContenter.appendChild(parent.createSubmitForm('vlanDot1TagCfg', 'dot1based_advanced_vlan_membership.htm', secureRand));
+        
+            // Create Control Bar
+            contentArea.appendChild(parent.createCtrlBar(parent.RadioButton0002+'?'+parent.RadioButton0001, 'Apply?Cancel', 'javascript:void(0)?javascript:void(0)'));
+                        
+            // Create VLAN membership Block
+            // Create Main Area
+            contentArea.appendChild(parent.createBlkArea('vlanMemBlk', parent.Vlan0017, 'blkArea_ui'));
+            
+            // Insert help dialog			
+			document.getElementById('vlanMemBlkHIcon').src = helpIcon;
+			document.getElementById('vlanMemBlkHIcon').setAttribute('style', 'width:11px; height:11px;');
+			
+			var arg = 'window.open("help.htm?from=qvlanadmem", "_blank", "width=400, height=400")';
+            document.getElementById('vlanMemBlkHIcon').setAttribute('onclick', arg);
+
+            
+            // Insert Data
+            // 1. Insert lag configuration header table into body area
+            document.getElementById('vlanMemBlkBArea').appendChild(parent.createTableEle('vlanMemTHeader', 'tableHeader_ui'));
+            if(portNum == 16){
+                colWidth = '160px?auto?auto';
+            }
+            else if(portNum == 24){
+                colWidth = '200px?auto?auto';
+                //document.getElementById('vlanMemTHeader').setAttribute('style', 'width: 773px; min-width: 773px;');
+            }
+            
+            // 1.1 Insert data into table
+            data[0] = parent.createDivEle('vlanMemDiv1', parent.Vlan0056, 'textLeft');
+            data[1] = parent.createSelectWithText('selVid', parent.Vlan0007, vlanMemOption, vlanMemOption, '1', 'changeVlanId(this.selectedIndex)', 'comboInputStyle selStyle');
+            data[2] = parent.createSelectWithText('selGOper', parent.Vlan0012, groupOptOption, groupOptOptionValue,'', 'changeGroupOperation(this.options[this.selectedIndex].value)', 'comboInputStyle selStyle');
+            parent.createOneRowEle(0, document.getElementById('vlanMemTHeader'), data, colWidth, 'borderNone');
+            
+            //
+            disableControl();
+            
+            //  Insert Data
+            // 2. Insert VLAN member data table into body area
+            document.getElementById('vlanMemBlkBArea').appendChild(parent.createTableEle('vlanMemTData', 'mTop10'));
+           /* if(portNum == 16){
+                colWidth = 480 / portNum + 'px';
+            }
+            else if(portNum == 24){
+                colWidth = 720 / portNum + 'px';
+            }*/
+            
+            // 2.1 Insert data into table
+            data = [];
+            data[0] = parent.createDivEle('vlanMemDiv2', parent.System0017, 'portText');
+            for(var i=0; i<portNum; i++)
+            {
+                var portIndex = i + 1;
+                var portBtnId = 'port' + portIndex + 'Btn';
+                var clickAction = 'portCheck(' + portIndex + ')';
+                var mouseOverAndOutAction = 'mouseOver(' + portIndex + ')?mouseOut(' + portIndex + ')';
+                
+                data[i + 1] = parent.createPortBox2(portBtnId, blankImg + '?' + blankImgHover + '?' + tagImg + '?' + tagHoverImg + '?' + untagImg + '?'+ untagHoverImg , portIndex, clickAction, mouseOverAndOutAction);
+            }
+            parent.createOneRowEle(0, document.getElementById('vlanMemTData'), data, 'auto', 'borderNone');
+        </script>
+    </div>
+</body>
+</html>

@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "netgear-collector"
+version = "0.1.0"
+description = "Read-only NETGEAR Plus switch telemetry collector for the UniFi switch emulator"
+requires-python = ">=3.12"
+dependencies = [
+  # Pinned to a reviewed main-branch commit: it adds MaxSessionsError and
+  # GS116Ev2 port descriptions that the 0.7.0 release lacks.
+  "py-netgear-plus @ git+https://github.com/foxey/py-netgear-plus@552b041a0a49be23a6c6589ab450e4d308f75a9a",
+  "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6"]
+
+[project.scripts]
+netgear-collector = "netgear_collector.__main__:main"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/netgear_collector"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["netgear_collector"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]

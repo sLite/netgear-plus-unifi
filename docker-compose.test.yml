@@ -1,0 +1,22 @@
+# Disposable UniFi Network controller for testing. Never point this stack at
+# the production Dream Router. UI: https://127.0.0.1:18443
+# (seeded account: admin / unifi-containers-seeded)
+services:
+  unifi-controller:
+    image: ghcr.io/jamesbraid/unifi-network:10.6.109-seeded
+    networks:
+      default:
+        ipv4_address: 172.29.0.10 # fixed: UniFi rejects hostnames in inform URLs
+    ports:
+      - "127.0.0.1:18443:8443"
+
+  emulator:
+    depends_on: [collector, unifi-controller]
+    environment:
+      UNIFI_INFORM_URL: http://172.29.0.10:8080/inform
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.29.0.0/24

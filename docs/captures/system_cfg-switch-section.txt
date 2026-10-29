@@ -1,0 +1,71 @@
+# UniFi Network 10.6.109 -> emulated USL16LP (virtual GS116Ev2), setparam.system_cfg
+# switch section only, secrets redacted by the emulator. Port overrides set in the
+# test controller for this capture:
+#   port 3: native VLAN 20, block all tagged      (access port)
+#   port 4: native Default, tagged all except 30  (trunk)
+#   port 5: forward=disabled                      (port disabled)
+#   port 6: autoneg off, 100 Mbit/s full duplex
+# Networks: Default (VLAN 1), test-vlan-20, test-vlan-30.
+vlan.status=disabled
+bridge.status=disabled
+switch.power_source.status=disabled
+switch.managementvlan=1
+switch.wevent.idp=enabled
+switch.wevent.mcip=239.254.127.63
+switch.wevent.key=<redacted>
+switch.jumboframes=disabled
+switch.mtu=9216
+switch.vlan.1.id=1
+switch.vlan.1.mode=untagged
+switch.vlan.1.status=enabled
+switch.vlan.2.id=20
+switch.vlan.2.mode=tagged
+switch.vlan.2.status=enabled
+switch.vlan.3.id=30
+switch.vlan.3.mode=tagged
+switch.vlan.3.status=enabled
+switch.routing_enabled=false
+switch.port.1.name=Port 1
+switch.port.1.opmode=switch
+switch.port.2.name=Port 2
+switch.port.2.opmode=switch
+switch.port.3.name=access-vlan20
+switch.port.3.opmode=switch
+switch.port.3.pvid=20
+switch.vlan.1.port.3.mode=exclude
+switch.vlan.2.port.3.mode=untagged
+switch.vlan.3.port.3.mode=exclude
+switch.port.4.name=trunk
+switch.port.4.opmode=switch
+switch.vlan.1.port.4.mode=untagged
+switch.vlan.2.port.4.mode=tagged
+switch.vlan.3.port.4.mode=exclude
+switch.port.5.name=disabled-port
+switch.port.5.status=disabled
+switch.port.5.opmode=switch
+switch.port.6.name=forced-100
+switch.port.6.autoneg=disabled
+switch.port.6.duplex=enabled
+switch.port.6.speed=100
+switch.port.6.ld_mode=disabled
+switch.port.6.opmode=switch
+switch.port.7.name=Port 7
+switch.port.7.opmode=switch
+switch.port.8.name=Port 8
+switch.port.8.opmode=switch
+switch.port.9.name=Port 9
+switch.port.9.opmode=switch
+switch.port.10.name=Port 10
+switch.port.10.opmode=switch
+switch.port.11.name=Port 11
+switch.port.11.opmode=switch
+switch.port.12.name=Port 12
+switch.port.12.opmode=switch
+switch.port.13.name=Port 13
+switch.port.13.opmode=switch
+switch.port.14.name=Port 14
+switch.port.14.opmode=switch
+switch.port.15.name=Port 15
+switch.port.15.opmode=switch
+switch.port.16.name=Port 16
+switch.port.16.opmode=switch

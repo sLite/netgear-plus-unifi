@@ -1,0 +1,29 @@
+# Hardware-free development setup: two simulated NETGEAR switches.
+#   SWITCHES_CONFIG=./config/switches.mock.yaml docker compose \
+#     -f docker-compose.yml -f docker-compose.test.yml up -d --build
+collector:
+  listen: "0.0.0.0:8099"
+  poll_interval_seconds: 10
+
+emulator:
+  inform_url: "http://172.29.0.10:8080/inform"
+  collector_url: "http://collector:8099"
+  state_dir: "/data"
+
+switches:
+  - id: mock-gs308ev4
+    source:
+      adapter: mock
+      mock: {model: GS308Ev4, seed: 1, flap_port: 2, flap_period_seconds: 120}
+    unifi:
+      model: USL8LP
+      name: "Mock GS308Ev4"
+  - id: mock-gs116ev2
+    source:
+      adapter: mock
+      mock: {model: GS116Ev2, seed: 7, failure_rate: 0.05}
+    unifi:
+      model: USL16LP
+      name: "Mock GS116Ev2"
+      downlinks:
+        - {port: 2, switch: mock-gs308ev4} # declared: the mock GS308Ev4 hangs off port 2
