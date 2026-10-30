@@ -44,6 +44,12 @@ switches:
       mac: physical
       name: "GS308Ev4"
       ip: physical                # report the NETGEAR management IP
+      # Optional, operator-declared uplink (the NETGEARs have no LLDP). UniFi
+      # marks the port as uplink but draws no topology line (docs/REPORT.md). This
+      # switch's port 8 is cabled to port 2 of the UniFi device with that MAC
+      # (e.g. the gateway). Use the device MAC shown in UniFi (device details
+      # → MAC Address), not the LAN interface MAC from ARP; they differ.
+      # uplink: {port: 8, mac: "aa:bb:cc:dd:ee:ff", remote_port: 2}
 
   - id: gs116ev2
     source:

@@ -108,3 +108,27 @@ func TestDownlinkValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestUplinkValidation(t *testing.T) {
+	sw := func(u string) string {
+		return minimal + "switches: [{id: a, source: {adapter: mock}, unifi: {model: US8, " + u + "}}, " +
+			"{id: b, source: {adapter: mock}, unifi: {model: US8}}]"
+	}
+	cfg, err := Parse([]byte(sw("uplink: {port: 8, mac: '8C:30:66:00:00:01', remote_port: 2}")), noEnv)
+	if err != nil {
+		t.Fatalf("valid uplink rejected: %v", err)
+	}
+	if u := cfg.Switches[0].UniFi.Uplink; u == nil || u.Port != 8 || u.RemotePort != 2 {
+		t.Errorf("uplink = %+v", u)
+	}
+	for bad, want := range map[string]string{
+		"uplink: {port: 8, mac: nope, remote_port: 2}":                                                   "uplink mac",
+		"uplink: {port: 0, mac: '8c:30:66:00:00:01', remote_port: 2}":                                    "remote_port >= 1",
+		"uplink: {port: 8, mac: '8c:30:66:00:00:01'}":                                                    "remote_port >= 1",
+		"uplink: {port: 2, mac: '8c:30:66:00:00:01', remote_port: 2}, downlinks: [{port: 2, switch: b}]": "also declared as a downlink",
+	} {
+		if _, err := Parse([]byte(sw(bad)), noEnv); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: error %v, want mention of %q", bad, err, want)
+		}
+	}
+}

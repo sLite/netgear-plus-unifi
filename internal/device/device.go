@@ -334,6 +334,20 @@ func (d *Device) learnMAC(now time.Time) string {
 	return ""
 }
 
+// declaredUplink returns the configured upstream device, if any. The MAC
+// was validated when the configuration was loaded.
+func (d *Device) declaredUplink() *uplink {
+	u := d.sw.UniFi.Uplink
+	if u == nil {
+		return nil
+	}
+	hw, err := u.HardwareAddr()
+	if err != nil {
+		return nil
+	}
+	return &uplink{Port: u.Port, MAC: hw.String(), RemotePort: u.RemotePort}
+}
+
 // resolveDownlinks looks up the MACs of declared downstream switches. A peer
 // whose MAC is not known yet is skipped until it is.
 func (d *Device) resolveDownlinks() []neighbor {
@@ -422,6 +436,7 @@ func (d *Device) encodeInform(now time.Time, snap *telemetry.Snapshot, downlinks
 		IP:          d.reportedIP(snap),
 		Snapshot:    snap,
 		Downlinks:   downlinks,
+		Uplink:      d.declaredUplink(),
 		Provisioned: d.st.Provisioned,
 	})
 	if err != nil {

@@ -79,8 +79,10 @@ Test controller UI: <https://127.0.0.1:18443>, login `admin` /
 netgear-unifi netgear-unifi ids`. Full walkthrough: [docs/TESTING.md](docs/TESTING.md).
 Without hardware, use `SWITCHES_CONFIG=./config/switches.mock.yaml`.
 
-Production use alongside the Dream Router 7 requires explicit approval and is
-described in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+Production use alongside the Dream Router 7, day-to-day commands (start,
+restart, logs, update), moving to another host and running on Coolify
+(`docker-compose.coolify.yml`) are described in
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Configuration
 
@@ -100,6 +102,7 @@ section (the virtual UniFi device). Unknown keys are errors.
 | `unifi.mac` | `physical` (the NETGEAR's own MAC), `auto` (derived `02:4e:47:…`) or an explicit locally administered MAC. Changing it requires forgetting and re-adopting the device. |
 | `unifi.ip` | `physical` (report the NETGEAR IP) or an IPv4 literal |
 | `unifi.downlinks` | optional, **operator-declared** topology between configured switches; never detected |
+| `unifi.uplink` | optional, **operator-declared** upstream device: `{port: 8, mac: <gateway device MAC as shown in UniFi>, remote_port: 2}`. UniFi marks the port as uplink and lists the gateway (name, MAC, IP) as the port's neighbour in the ports view; it does not draw the topology line (see report §6) |
 | `controller.inform_url` | controller inform URL (an IP); env `UNIFI_INFORM_URL` overrides |
 | `stale_after_seconds` | telemetry age after which informs pause (default 90) |
 | `state_dir` | adoption state, contains auth keys (default `/data`; env `STATE_DIR`) |

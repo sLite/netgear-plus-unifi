@@ -13,6 +13,8 @@
 //	                      [speed=auto|10|100|1000] [duplex=full|half] [name=TEXT]
 //	                                      set a port override, like the port editor in the UI
 //	unifi-testctl port-reset MAC PORT     remove a port override (back to defaults)
+//	unifi-testctl get PATH                print the JSON of a site API path (e.g. stat/device,
+//	                                      v2/firewall-policies)
 //
 // Environment: UNIFI_URL (default https://127.0.0.1:18443), UNIFI_USER
 // (admin), UNIFI_PASSWORD (default: the seeded test image's password),
@@ -20,8 +22,10 @@
 //
 // Safety: refuses any controller outside loopback/docker networks unless
 // ALLOW_NON_TEST_CONTROLLER=1 is set, so it cannot touch a production
-// controller by accident. TLS verification is off because test controllers
-// use self-signed certificates.
+// controller by accident. Even then, a non-test controller is read-only:
+// apart from the login, only GET requests are sent (devices, ports, get).
+// UniFi OS consoles (e.g. a Dream Router) are detected at login. TLS
+// verification is off because controllers use self-signed certificates.
 package main
 
 import (
@@ -53,18 +57,36 @@ func main() {
 
 func run(args []string) error {
 	base := strings.TrimRight(envOr("UNIFI_URL", "https://127.0.0.1:18443"), "/")
-	if err := guard(base); err != nil {
+	test, err := guard(base)
+	if err != nil {
 		return err
 	}
 	if len(args) == 0 {
 		return errors.New(usage())
 	}
-	c, err := login(base)
+	c, err := login(base, !test)
 	if err != nil {
 		return err
 	}
 	cmd, rest := args[0], args[1:]
 	switch {
+	case cmd == "get" && len(rest) == 1:
+		path := strings.TrimPrefix(rest[0], "/")
+		var out json.RawMessage
+		if v2, ok := strings.CutPrefix(path, "v2/"); ok {
+			// v2 endpoints answer bare JSON instead of {"data": ...}.
+			raw, err := c.raw("GET", "/v2/api/site/"+c.site+"/"+v2)
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(raw))
+			return nil
+		}
+		if err := c.call("GET", "/"+path, nil, &out); err != nil {
+			return err
+		}
+		fmt.Println(string(out))
+		return nil
 	case cmd == "devices":
 		return c.showDevices()
 	case cmd == "ports" && len(rest) == 1:
@@ -112,40 +134,52 @@ func run(args []string) error {
 
 func usage() string {
 	return "usage: unifi-testctl devices | ports MAC | adopt MAC... | wait MAC... | forget MAC... | name MAC NAME | " +
-		"network NAME VLAN | network-delete VLAN | port MAC PORT [key=value...] | port-reset MAC PORT"
+		"network NAME VLAN | network-delete VLAN | port MAC PORT [key=value...] | port-reset MAC PORT | get PATH"
 }
 
-// guard refuses controllers outside loopback and private docker networks.
-func guard(base string) error {
+// guard refuses controllers outside loopback and private docker networks,
+// unless explicitly allowed; test reports whether base is a test controller.
+func guard(base string) (test bool, err error) {
 	u, err := url.Parse(base)
 	if err != nil {
-		return err
+		return false, err
 	}
 	host := u.Hostname()
-	test := host == "localhost" || host == "unifi-controller"
+	test = host == "localhost" || host == "unifi-controller"
 	if ip := net.ParseIP(host); ip != nil {
 		_, docker, _ := net.ParseCIDR("172.16.0.0/12")
 		test = ip.IsLoopback() || docker.Contains(ip)
 	}
 	if !test && os.Getenv("ALLOW_NON_TEST_CONTROLLER") != "1" {
-		return fmt.Errorf("refusing %s: not a local test controller (set ALLOW_NON_TEST_CONTROLLER=1)", base)
+		return false, fmt.Errorf("refusing %s: not a local test controller (set ALLOW_NON_TEST_CONTROLLER=1)", base)
 	}
-	return nil
+	return test, nil
 }
 
 type controller struct {
 	base, site string
 	hc         *http.Client
+	// network is the path prefix of the Network application: "" on a
+	// standalone controller, "/proxy/network" on a UniFi OS console.
+	network string
+	// readOnly permits only GET requests after the login.
+	readOnly bool
 }
 
-func login(base string) (*controller, error) {
+// login signs in, trying the UniFi OS login first and the standalone
+// controller login second.
+func login(base string, readOnly bool) (*controller, error) {
 	jar, _ := cookiejar.New(nil)
-	c := &controller{base: base, site: envOr("UNIFI_SITE", "default"), hc: &http.Client{
+	c := &controller{base: base, site: envOr("UNIFI_SITE", "default"), readOnly: readOnly, hc: &http.Client{
 		Jar: jar, Timeout: 20 * time.Second,
-		Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}, //nolint:gosec // self-signed test controllers
+		Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}, //nolint:gosec // self-signed controllers
 	}}
 	creds := map[string]any{"username": envOr("UNIFI_USER", "admin"), "password": envOr("UNIFI_PASSWORD", "unifi-containers-seeded")}
-	if err := c.request("POST", "/api/login", creds, nil); err != nil {
+	if err := c.send("POST", "/api/auth/login", creds, nil); err == nil {
+		c.network = "/proxy/network"
+		return c, nil
+	}
+	if err := c.send("POST", "/api/login", creds, nil); err != nil {
 		return nil, fmt.Errorf("login: %w", err)
 	}
 	return c, nil
@@ -156,7 +190,36 @@ func (c *controller) call(method, path string, body, out any) error {
 	return c.request(method, "/api/s/"+c.site+path, body, out)
 }
 
+// request sends a request to a Network application path.
 func (c *controller) request(method, path string, body, out any) error {
+	if c.readOnly && method != "GET" {
+		return fmt.Errorf("refusing %s %s: read-only on a non-test controller", method, path)
+	}
+	return c.send(method, c.network+path, body, out)
+}
+
+// raw returns the body of a Network application request as is.
+func (c *controller) raw(method, path string) ([]byte, error) {
+	if c.readOnly && method != "GET" {
+		return nil, fmt.Errorf("refusing %s %s: read-only on a non-test controller", method, path)
+	}
+	req, err := http.NewRequest(method, c.base+c.network+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode/100 != 2 {
+		return nil, fmt.Errorf("%s %s: %s", method, path, resp.Status)
+	}
+	return body, nil
+}
+
+func (c *controller) send(method, path string, body, out any) error {
 	var r io.Reader
 	if body != nil {
 		raw, err := json.Marshal(body)

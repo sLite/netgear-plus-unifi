@@ -117,6 +117,27 @@ type Virtual struct {
 	// Downlinks optionally declare which other configured switch hangs off
 	// which port, so UniFi can draw the link between two NETGEARs.
 	Downlinks []Downlink `yaml:"downlinks"`
+	// Uplink optionally declares the UniFi device (e.g. the gateway) this
+	// switch's uplink port is cabled to, so UniFi can place it in the
+	// topology. NETGEAR Plus switches have no LLDP to learn it themselves.
+	Uplink *Uplink `yaml:"uplink"`
+}
+
+// Uplink is operator-declared topology: Port of this switch is connected
+// to RemotePort of the UniFi device with MAC.
+type Uplink struct {
+	Port       int    `yaml:"port"`
+	MAC        string `yaml:"mac"`
+	RemotePort int    `yaml:"remote_port"`
+}
+
+// HardwareAddr returns the upstream device's MAC.
+func (u Uplink) HardwareAddr() (net.HardwareAddr, error) {
+	hw, err := net.ParseMAC(u.MAC)
+	if err != nil || len(hw) != 6 {
+		return nil, fmt.Errorf("uplink mac %q is not a 6-byte MAC", u.MAC)
+	}
+	return hw, nil
 }
 
 // Downlink is operator-declared topology: Switch (another configured
@@ -268,6 +289,19 @@ func (s Switch) validate() []error {
 	}
 	if s.UniFi.Model == "" {
 		fail("unifi.model is required")
+	}
+	if u := s.UniFi.Uplink; u != nil {
+		if _, err := u.HardwareAddr(); err != nil {
+			fail("unifi.%v", err)
+		}
+		if u.Port < 1 || u.RemotePort < 1 {
+			fail("unifi.uplink needs port >= 1 and remote_port >= 1")
+		}
+		for _, dl := range s.UniFi.Downlinks {
+			if dl.Port == u.Port {
+				fail("unifi.uplink port %d is also declared as a downlink", u.Port)
+			}
+		}
 	}
 	if ip := s.UniFi.IP; ip != "" && ip != "physical" && net.ParseIP(ip).To4() == nil {
 		fail("unifi.ip %q must be \"physical\" or an IPv4 address", ip)

@@ -1,0 +1,25 @@
+# Coolify deployment (Docker Compose build pack; set "Docker Compose
+# Location" to /docker-compose.coolify.yml). See docs/DEPLOYMENT.md.
+#
+# Differences to docker-compose.yml:
+# - Passwords and options are Coolify environment variables (each ${VAR}
+#   below appears under the resource's Environment Variables) instead of .env.
+# - Configuration and adoption state are bind mounts under
+#   /srv/netgear-unifi on the Coolify server, so the state of an existing
+#   installation can be copied in before the first start.
+services:
+  netgear-unifi:
+    build: .
+    restart: unless-stopped
+    environment:
+      CONFIG_FILE: /config/switches.yaml
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      UNIFI_INFORM_URL: ${UNIFI_INFORM_URL:-} # empty = controller.inform_url from the config
+      # One entry per source.password_env in switches.yaml.
+      NETGEAR_GS308EV4_PASSWORD: ${NETGEAR_GS308EV4_PASSWORD:?}
+      NETGEAR_GS116EV2_PASSWORD: ${NETGEAR_GS116EV2_PASSWORD:?}
+    volumes:
+      - /srv/netgear-unifi/switches.yaml:/config/switches.yaml:ro
+      - /srv/netgear-unifi/state:/data # adoption state incl. auth keys; owned by uid 65532
+    ports:
+      - "127.0.0.1:8098:8098" # read-only status endpoint

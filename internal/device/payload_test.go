@@ -133,6 +133,35 @@ func TestOverlayDeclaredDownlinks(t *testing.T) {
 	}
 }
 
+func TestOverlayDeclaredUplink(t *testing.T) {
+	const gw = "8c:30:66:00:00:01"
+	m := overlay(t, overlayInput{Adopted: true, MAC: "28:94:01:00:00:01", Snapshot: testSnapshot(),
+		Uplink: &uplink{Port: 1, MAC: gw, RemotePort: 2}})
+	if row(m, 0)["is_uplink"] != true || row(m, 1)["is_uplink"] != false {
+		t.Errorf("is_uplink: port 1 %v, port 2 %v", row(m, 0)["is_uplink"], row(m, 1)["is_uplink"])
+	}
+	if _, ok := row(m, 0)["mac_table"]; ok {
+		t.Error("the upstream MAC must not be in mac_table: UniFi reads it as a downlink")
+	}
+	lldp, _ := m["lldp_table"].([]any)
+	if len(lldp) != 1 {
+		t.Fatalf("lldp_table = %v", m["lldp_table"])
+	}
+	if e := lldp[0].(map[string]any); e["chassis_id"] != gw || e["port_id"] != gw || e["local_port_idx"] != 1.0 {
+		t.Errorf("lldp entry = %v", e)
+	}
+	up, _ := m["uplink"].(map[string]any)
+	if up["uplink_mac"] != gw || up["uplink_remote_port"] != 2.0 || up["port_idx"] != 1.0 ||
+		up["up"] != true || up["speed"] != 1000.0 || up["mac"] != "28:94:01:00:00:01" {
+		t.Errorf("uplink = %v", up)
+	}
+
+	plain := overlay(t, overlayInput{Adopted: true, Snapshot: testSnapshot()})
+	if _, ok := plain["uplink"]; ok || plain["lldp_table"] != nil || row(plain, 0)["is_uplink"] != nil {
+		t.Error("nothing about an uplink may be reported unless declared")
+	}
+}
+
 func TestOverlaySpeedCaps(t *testing.T) {
 	snap := testSnapshot()
 	snap.Device.PortSpeeds = []string{"auto", "10f", "100f", "1000f"}

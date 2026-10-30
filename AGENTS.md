@@ -20,6 +20,7 @@ hardware. One Go program, `cmd/netgear-unifi`, one container. Background:
 | `internal/mock` | Simulated switches (dev without hardware) and an in-memory `provision.Backend` used by tests |
 | `internal/config` | `config/switches.yaml` (strict: unknown keys are errors) |
 | `internal/netgear/testdata/<model>/` | Pages recorded from real switches, anonymised |
+| `docker-compose.yml`, `docker-compose.test.yml`, `docker-compose.coolify.yml` | Production, test-controller overlay, Coolify ([docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)) |
 
 ## Checks
 

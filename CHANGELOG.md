@@ -41,6 +41,13 @@ All notable changes to this project are documented here. The format follows
   learned from the switch and persisted, so the gateway sees the device's
   identity on the wire. A changed switch MAC pauses the device.
 - Operator-declared downlink topology between configured switches.
+- `unifi.uplink`: operator-declared upstream device (e.g. the gateway) and
+  ports, reported as an LLDP neighbour, uplink object and `is_uplink`. UniFi
+  marks the port as uplink and shows the gateway on it in the ports view; on a DR7 it still draws no topology line, because
+  the controller builds wired topology from the upstream device's own LLDP.
+- `unifi-testctl` logs in to UniFi OS consoles and is strictly read-only
+  (GET only) on any non-test controller (`ALLOW_NON_TEST_CONTROLLER=1`); new
+  `get PATH` command.
 - Persisted adoption state (restart survival), binding of each virtual
   device to its physical switch (model and serial).
 - Mock switches (link flapping, failure injection, in-memory writes) for
@@ -51,6 +58,10 @@ All notable changes to this project are documented here. The format follows
 - `cmd/unifi-testctl`: drives a disposable test controller (devices, ports,
   adopt, wait, forget, name, networks, port overrides); refuses non-test
   controllers.
+- `docker-compose.coolify.yml` for Coolify (passwords as Coolify variables,
+  config and state as bind mounts) and documented procedures for starting,
+  restarting, moving the installation with its adoption state, and migrating
+  to Coolify.
 - Docker Compose deployment, disposable test-controller overlay,
   documentation (testing, DR7 deployment, technical report, configuration
   writes).
