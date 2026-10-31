@@ -141,8 +141,31 @@ func ParseUniFi(text string, ports int) Parsed {
 			warnings = append(warnings, warning)
 		}
 		cfg.Ports[port] = PortSettings{Speed: speed, Name: SetName(explicitName(port, keys["name"]))}
+		if speed == SpeedDisabled {
+			nativeOnly(cfg, port)
+		}
 	}
 	return Parsed{Config: cfg, Warnings: warnings}
+}
+
+// nativeOnly limits a disabled port to its native VLAN, untagged. UniFi
+// sends no VLAN overrides for disabled ports, so its "allow all" defaults
+// would otherwise tag every network on them. A disabled port carries no
+// traffic either way; without tagged VLANs it is also safe if re-enabled
+// on the switch itself, and UniFi sends its real settings when it is
+// re-enabled there.
+func nativeOnly(cfg *Config, port int) {
+	native := cfg.PVIDs[port]
+	if _, ok := cfg.VLANs[native]; !ok {
+		native = DefaultVLAN
+		cfg.PVIDs[port] = native
+	}
+	for _, members := range cfg.VLANs {
+		delete(members, port)
+	}
+	if members, ok := cfg.VLANs[native]; ok {
+		members[port] = Untagged
+	}
 }
 
 func (keys unifiPort) speed(port int) (Speed, string) {

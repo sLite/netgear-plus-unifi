@@ -126,8 +126,11 @@ must be read immediately before posting. Field order is `submitId … submitEnd`
 - VLANs created in the NETGEAR web UI that UniFi does not know are deleted
   once writes are live (UniFi is authoritative), unless they are VLAN 1 or
   the management VLAN.
-- A disabled port carries no VLAN exclusions in `system_cfg`. The planner
-  applies the VLAN defaults to it as well; the port is down anyway.
+- A disabled port carries no VLAN exclusions in `system_cfg`, so UniFi's
+  "Allow All" default would tag every network on it. The integration keeps a
+  disabled port in its native VLAN only (untagged, nothing tagged): no stale
+  VLANs, and nothing extra if the port is re-enabled on the switch itself.
+  When it is re-enabled in UniFi, UniFi sends its real settings again.
 - Forgetting the device in UniFi does **not** revert the switch. The ports
   keep their last configuration (a native switch would factory-reset).
 

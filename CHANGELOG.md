@@ -41,6 +41,9 @@ All notable changes to this project are documented here. The format follows
   learned from the switch and persisted, so the gateway sees the device's
   identity on the wire. A changed switch MAC pauses the device.
 - Operator-declared downlink topology between configured switches.
+- Disabled ports are kept in their native VLAN only, with no tagged VLANs.
+  UniFi sends no VLAN settings for disabled ports, which previously made the
+  integration tag every network on them ("Allow All").
 - `unifi.uplink`: operator-declared upstream device (e.g. the gateway) and
   ports, reported as an LLDP neighbour, uplink object and `is_uplink`. UniFi
   marks the port as uplink and shows the gateway on it in the ports view; on a DR7 it still draws no topology line, because

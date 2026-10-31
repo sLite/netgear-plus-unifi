@@ -81,7 +81,7 @@ func TestDryRunPlansButDoesNotWrite(t *testing.T) {
 	h.tick(s)
 	st := s.Status()
 	want := []string{
-		"create VLAN 3901 with port 1=T, port 2=T, port 3=T, port 4=U, port 5=T, port 6=T, port 7=T, port 8=T",
+		"create VLAN 3901 with port 1=T, port 2=T, port 3=T, port 4=U, port 6=T, port 7=T, port 8=T", // port 5 disabled: native only
 		"port 4: PVID 3901",
 		"VLAN 1: set port 4=E",
 		`port 5: speed disabled, name ""`,
@@ -106,6 +106,7 @@ func TestLiveApplyManagesTheWholeSwitch(t *testing.T) {
 	cfg := h.backend.Config
 	want3901 := all(8, T)
 	want3901[4] = U
+	delete(want3901, 5) // disabled: native VLAN only
 	if !maps.Equal(cfg.VLANs[3901], want3901) || cfg.Member(1, 4) != E || len(cfg.VLANs[1]) != 7 {
 		t.Errorf("VLANs = %v", cfg.VLANs)
 	}

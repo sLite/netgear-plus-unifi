@@ -234,3 +234,56 @@ func TestAdvertisedSpeeds(t *testing.T) {
 		t.Errorf("advertised = %v", got)
 	}
 }
+
+func TestDisabledPortKeepsOnlyItsNativeVLAN(t *testing.T) {
+	text := "switch.vlan.1.id=1\nswitch.vlan.1.mode=untagged\n" +
+		"switch.vlan.2.id=21\nswitch.vlan.2.mode=tagged\n" +
+		"switch.vlan.3.id=241\nswitch.vlan.3.mode=tagged\n" +
+		"switch.port.5.status=disabled\n" +
+		"switch.port.6.status=disabled\nswitch.port.6.pvid=241\n"
+	cfg := ParseUniFi(text, 8).Config
+	check := func(port int, want ...Member) {
+		t.Helper()
+		got := []Member{cfg.Member(1, port), cfg.Member(21, port), cfg.Member(241, port)}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("port %d memberships (1, 21, 241) = %v, want %v", port, got, want)
+		}
+	}
+	check(5, U, E, E) // disabled: native VLAN 1 only
+	check(6, E, E, U) // disabled with native 241
+	check(4, U, T, T) // active port keeps UniFi's "allow all"
+	if cfg.PVIDs[6] != 241 || cfg.Ports[5].Speed != SpeedDisabled {
+		t.Errorf("PVID 6 = %d, port 5 = %v", cfg.PVIDs[6], cfg.Ports[5])
+	}
+
+	// A switch whose disabled port still carries tagged VLANs is cleaned up.
+	actual := FactoryDefault(8)
+	actual.VLANs[21] = all(8, T)
+	actual.VLANs[241] = all(8, T)
+	for p := 1; p <= 8; p++ {
+		if p == 5 || p == 6 {
+			continue
+		}
+		actual.VLANs[21][p], actual.VLANs[241][p] = T, T
+	}
+	actual.Ports[5] = PortSettings{Speed: SpeedDisabled}
+	actual.Ports[6] = PortSettings{Speed: SpeedDisabled}
+	plan := MakePlan(cfg, actual, 8, caps)
+	want := []string{
+		"VLAN 241: set port 6=U",
+		"port 6: PVID 241",
+		"VLAN 1: set port 6=E",
+		"VLAN 21: set port 5=E, port 6=E",
+		"VLAN 241: set port 5=E",
+	}
+	if !reflect.DeepEqual(plan.Describe(), want) {
+		t.Errorf("plan:\n got %q\nwant %q", plan.Describe(), want)
+	}
+}
+
+func TestDisabledPortWithUnknownNativeVLANFallsBackToDefault(t *testing.T) {
+	cfg := ParseUniFi("switch.vlan.1.id=1\nswitch.vlan.1.mode=untagged\nswitch.port.3.status=disabled\nswitch.port.3.pvid=99", 4).Config
+	if cfg.PVIDs[3] != DefaultVLAN || cfg.Member(1, 3) != U {
+		t.Errorf("PVID %d, VLAN 1 membership %v", cfg.PVIDs[3], cfg.Member(1, 3))
+	}
+}
